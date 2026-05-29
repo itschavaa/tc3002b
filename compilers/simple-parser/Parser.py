@@ -15,6 +15,23 @@ class Parser:
 		self.firstMultiplicativeExpression = self.firstUnaryExpression
 		self.firstExtendedAdditiveExpression = set((ord('+'), ord('-')))
 		self.firstAdditiveExpression = self.firstMultiplicativeExpression
+		self.firstExtendedRelationalExpression = set((ord('<'), Tag.LEQ, ord('>'), Tag.GEQ))
+		self.firstRelationalExpression = self.firstAdditiveExpression
+		self.firstExtendedEqualityExpression = set((ord('='), Tag.NEQ))
+		self.firstEqualityExpression = self.firstRelationalExpression
+		self.firstExtendedConditionalTerm = set((Tag.AND,))
+		self.firstConditionalTerm = self.firstEqualityExpression
+		self.firstExtendedConditionalExpression = set((Tag.OR,))
+		self.firstConditionalExpression = self.firstConditionalTerm
+		self.firstExpression = self.firstConditionalExpression
+		self.firstTextStatement = set((Tag.PRINT,))
+		self.firstAssignmentStatement = set((Tag.ID,))
+		self.firstStatement = self.firstAssignmentStatement.union(self.firstTextStatement)
+		self.firstStatementSequence = self.firstStatement
+		self.firstIdentifierList = set((ord(','),))
+		self.firstDeclarationSequence = set((Tag.VAR,))
+		self.firstProgram = self.firstDeclarationSequence
+
 
 	def error(self, extra = None):
 		text = 'Line ' + str(self.lex.line) + " - " 
@@ -98,52 +115,198 @@ class Parser:
 			pass
 
 	#<multiplicative-expression> ::= <unary-expression> <extended-multiplicative-expression>
+	def multiplicativeExpression(self):
+		if self.token.tag in self.firstMultiplicativeExpression:
+			self.unaryExpression()
+			self.extendedMultiplicativeExpression()
+		else:
+			self.error("expected a multiplicative expression before " + str(self.token))
 	
 	#<extended-additive-expression> ::= '+' <multiplicative-expression> <extended-additive-expression>
 	#<extended-additive-expression> ::= '-' <multiplicative-expression> <extended-additive-expression>
 	#<extended-additive-expression> ::= ' '
+	def extendedAdditiveExpression(self):
+		if self.token.tag in self.firstExtendedAdditiveExpression:
+			if self.token.tag == ord('+'):
+				self.check(ord('+'))
+				self.multiplicativeExpression()
+				self.extendedAdditiveExpression()
+			elif self.token.tag == ord('-'):
+				self.check(ord('-'))
+				self.multiplicativeExpression()
+				self.extendedAdditiveExpression()
+		else:
+			pass
 	
 	#<additive-expression> ::= <multiplicative-expression> <extended-additive-expression>
+	def additiveExpression(self):
+		if self.token.tag in self.firstAdditiveExpression:
+			self.multiplicativeExpression()
+			self.extendedAdditiveExpression()
+		else:
+			self.error("expected an additive expression before " + str(self.token))
 	
 	#<extended-relational-expression> := '<' <additive-expression> <extended-relational-expression>
 	#<extended-relational-expression> ::= '<''=' <additive-expression> <extended-relational-expression>
 	#<extended-relational-expression> := '>' <additive-expression> <extended-relational-expression>
 	#<extended-relational-expression> ::= '>''=' <additive-expression> <extended-relational-expression>
 	#<extended-relational-expression> ::= ' '
+	def extendedRelationalExpression(self):
+		if self.token.tag in self.firstExtendedRelationalExpression:
+			if self.token.tag == ord('<'):
+				self.check(ord('<'))
+				self.additiveExpression()
+				self.extendedRelationalExpression()
+			elif self.token.tag == Tag.LEQ:
+				self.check(Tag.LEQ)
+				self.additiveExpression()
+				self.extendedRelationalExpression()
+			elif self.token.tag == ord('>'):
+				self.check(ord('>'))
+				self.additiveExpression()
+				self.extendedRelationalExpression()
+			elif self.token.tag == Tag.GEQ:
+				self.check(Tag.GEQ)
+				self.additiveExpression()
+				self.extendedRelationalExpression()
+		else:
+			pass
 	
 	#<relational-expression> ::= <additive-expression> <extended-relational-expression>
+	def relationalExpression(self):
+		if self.token.tag in self.firstRelationalExpression:
+			self.additiveExpression()
+			self.extendedRelationalExpression()
+		else:
+			self.error("expected a relational expression before " + str(self.token))
 	
 	#<extended-equality-expression> := '=' <relational-expression> <extended-equality-expression>
 	#<extended-equality-expression> := '<''>' <relational-expression> <extended-equality-expression>
 	#<extended-equality-expression> ::= ' '
+	def extendedEqualityExpression(self):
+		if self.token.tag in self.firstExtendedEqualityExpression:
+			if self.token.tag == ord('='):
+				self.check(ord('='))
+				self.relationalExpression()
+				self.extendedEqualityExpression()
+			elif self.token.tag == Tag.NEQ:
+				self.check(Tag.NEQ)
+				self.relationalExpression()
+				self.extendedEqualityExpression()
+		else:
+			pass
 	
 	#<equality-expression> ::= <relational-expression> <extended-equality-expression>
+	def equalityExpression(self):
+		if self.token.tag in self.firstEqualityExpression:
+			self.relationalExpression()
+			self.extendedEqualityExpression()
+		else:
+			self.error("expected an equality expression before " + str(self.token))
 	
 	#<extended-conditional-term> ::= AND <equality-expression> <extended-conditional-term>
 	#<extended-boolean-term> ::= ' '
+	def extendedConditionalTerm(self):
+		if self.token.tag in self.firstExtendedConditionalTerm:
+			if self.token.tag == Tag.AND:
+				self.check(Tag.AND)
+				self.equalityExpression()
+				self.extendedConditionalTerm()
+		else:
+			pass
 
 	#<conditional-term> ::= <equality-expression> <extended-conditional-term>
+	def conditionalTerm(self):
+		if self.token.tag in self.firstConditionalTerm:
+			self.equalityExpression()
+			self.extendedConditionalTerm()
+		else:
+			self.error("expected a conditional term before " + str(self.token))
 	
 	#<extended-conditional-expression> ::= OR <conditional-term> <extended-conditional-expression>
 	#<extended-conditional-expression> ::= ' '
+	def extendedConditionalExpression(self):
+		if self.token.tag in self.firstExtendedConditionalExpression:
+			if self.token.tag == Tag.OR:
+				self.check(Tag.OR)
+				self.conditionalTerm()
+				self.extendedConditionalExpression()
+		else:
+			pass
 
 	#<conditional-expression> ::= <conditional-term> <extended-conditional-expression>
+	def conditionalExpression(self):
+		if self.token.tag in self.firstConditionalExpression:
+			self.conditionalTerm()
+			self.extendedConditionalExpression()
+		else:
+			self.error("expected a conditional expression before " + str(self.token))
 	
 	#<expression> ::= <conditional-expression>
+	def expression(self):
+		if self.token.tag in self.firstExpression:
+			self.conditionalExpression()
+		else:
+			self.error("expected an expression before " + str(self.token))
 	
 	#<text-statement> ::= PRINT '(' <expression> )'
+	def textStatement(self):
+		if self.token.tag in self.firstTextStatement:
+			if self.token.tag == Tag.PRINT:
+				self.check(Tag.PRINT)
+				self.check(ord('('))
+				self.expression()
+				self.check(ord(')'))
+		else:
+			self.error("expected a text statement before " + str(self.token))
 	
 	#<assigment-statement> ::= <identifier> ':''=' <expression>
+	def assignmentStatement(self):
+		if self.token.tag in self.firstAssignmentStatement:
+			if self.token.tag == Tag.ID:
+				self.check(Tag.ID)
+				self.check(Tag.ASSIGN)
+				self.expression()
+		else:
+			self.error("expected an assignment statement before " + str(self.token))
 	
 	#<statement> ::= <assignment-statement> | <text-statement>
+	def statement(self):
+		if self.token.tag in self.firstStatement:
+			if self.token.tag in self.firstAssignmentStatement:
+				self.assignmentStatement()
+			elif self.token.tag in self.firstTextStatement:
+				self.textStatement()
 	
 	#<statement-sequence> ::= <statement> <statement-sequence>
 	#<statement-sequence> ::= ' '
+	def statementSequence(self):
+		if self.token.tag in self.firstStatementSequence:
+			self.statement()
+			self.statementSequence()
+		else:
+			pass
 	
 	#<identifier-list> ::= ',' <identifier> <identifier-list>
 	#<identifier-list> ::= ' '
+	def identifierList(self):
+		if self.token.tag in self.firstIdentifierList:
+			if self.token.tag == ord(','):
+				self.check(ord(','))
+				self.check(Tag.ID)
+				self.identifierList()
+		else:
+			pass
 	
 	#<declaration-sequence> ::= VAR <identifier> <identifier-list>
+	def declarationSequence(self):
+		if self.token.tag in self.firstDeclarationSequence:
+			if self.token.tag == Tag.VAR:
+				self.check(Tag.VAR)
+				self.check(Tag.ID)
+				self.identifierList()
+		else:
+			self.error("expected a declaration sequence before " + str(self.token))
 	
 	#<program> ::= <declaration-sequence> <statement-sequence>
 	def program(self):
